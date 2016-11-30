@@ -59,15 +59,15 @@ impl<'a> FileStream<'a, std::fs::File>{ //std::fs::File because we are talking c
 }
 
 impl<'a> Iterator for FileStream<'a, std::fs::File>{
-    type Item = [u8;512];
+    type Item = ([u8;512], usize);
     fn next(&mut self)->Option<Self::Item>{
         let mut arr = [0;512];
-        self.reader.read(&mut arr);
+        let num_bytes_read = self.reader.read(&mut arr);
         let mut i = 0usize;
         for c in self.buf.as_mut().unwrap().iter_mut(){
             *c = arr[i];
         }
-        Some(arr)
+        Some((arr, num_bytes_read.unwrap()))
     }
 }
 
