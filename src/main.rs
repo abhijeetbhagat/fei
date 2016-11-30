@@ -34,9 +34,9 @@ struct FileStream<'a, Read>{
     reader : BufReader<Read>
 }
 
-impl<'a> FileStream<'a, std::fs::File>{
+impl<'a> FileStream<'a, std::fs::File>{ //std::fs::File because we are talking concrete implementation
     fn new(file_name:String)->Option<Self>{
-        let f = match std::fs::File::open(file_name){
+        let f = match std::fs::File::open(file_name.clone()){
             Ok(handle) => Some(handle),
             Err(msg) => None
 
@@ -49,7 +49,7 @@ impl<'a> FileStream<'a, std::fs::File>{
                 reader : BufReader::with_capacity(512, f.unwrap()),
                 buf : None
             };
-            fs.reader.read(&mut fs.buf.unwrap());
+            //fs.reader.read(&mut buf);
             Some(fs)
         }
         else{
@@ -58,16 +58,24 @@ impl<'a> FileStream<'a, std::fs::File>{
     }
 }
 
-impl<'a, Read> Iterator for FileStream<'a, Read>{
-    type Item = &'a[u8];
+impl<'a> Iterator for FileStream<'a, std::fs::File>{
+    type Item = [u8;512];
     fn next(&mut self)->Option<Self::Item>{
-        Some(&self.buf[0..]) 
+        let mut arr = [0;512];
+        self.reader.read(&mut arr);
+        let mut i = 0usize;
+        for c in self.buf.as_mut().unwrap().iter_mut(){
+            *c = arr[i];
+        }
+        Some(arr)
     }
 }
 
+/*
 fn create_data_packet()->Vec<u8>{
 
 }
+*/
 
 fn recv() -> Result<(), Error> { 
     // Define the local connection information 
