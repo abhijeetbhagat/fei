@@ -1,7 +1,6 @@
 extern crate rand;
 use std::net::{Ipv4Addr, SocketAddrV4, UdpSocket};
-use std::io;
-use std::io::BufReader;
+use std::io::{BufReader, Read, Error};
 use std::fs::File;
 
 #[ repr(u16) ]
@@ -31,24 +30,27 @@ struct FileStream<'a, Read>{
     file_name : String,
     start : u64,
     end:u64,
-    buf:&'a mut[u8],
+    buf:Option<&'a mut[u8]>,
     reader : BufReader<Read>
 }
 
-impl<'a, Read> FileStream<'a, Read>{
+impl<'a> FileStream<'a, std::fs::File>{
     fn new(file_name:String)->Option<Self>{
-        let f = match File::open(file_name){
+        let f = match std::fs::File::open(file_name){
             Ok(handle) => Some(handle),
             Err(msg) => None
 
         };
         if f.is_some(){
-            Some(FileStream{
-                    file_name:file_name,
-                    start: 0,
-                    end: 0,
-                    reader : BufReader::with_capacity(512, f.unwrap()),
-                })
+            let mut fs = FileStream{
+                file_name:file_name,
+                start: 0,
+                end: 0,
+                reader : BufReader::with_capacity(512, f.unwrap()),
+                buf : None
+            };
+            fs.reader.read(&mut fs.buf.unwrap());
+            Some(fs)
         }
         else{
             None
@@ -67,7 +69,7 @@ fn create_data_packet()->Vec<u8>{
 
 }
 
-fn recv() -> Result<(), io::Error> { 
+fn recv() -> Result<(), Error> { 
     // Define the local connection information 
     let ip = Ipv4Addr::new(127, 0, 0, 1); 
     let connection = SocketAddrV4::new(ip, 69);
@@ -88,7 +90,7 @@ fn recv() -> Result<(), io::Error> {
 }
 
 
-fn send() -> Result<(), io::Error> { 
+fn send() -> Result<(), Error> { 
     // Define the local connection (to send the data from) 
     let ip = Ipv4Addr::new(127, 0, 0, 1); 
     //TODO generate port # using rand
