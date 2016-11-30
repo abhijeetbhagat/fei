@@ -1,6 +1,8 @@
 extern crate rand;
 use std::net::{Ipv4Addr, SocketAddrV4, UdpSocket};
 use std::io;
+use std::io::BufReader;
+use std::fs::File;
 
 #[ repr(u16) ]
 enum PacketType{
@@ -23,6 +25,42 @@ fn create_rrq_wrq_packet(p_type: PacketType, file_name: String, mode : &'static 
     v.extend(mode.as_bytes());
     v.push(0);//zero terminator
     v
+}
+
+struct FileStream<'a, Read>{
+    file_name : String,
+    start : u64,
+    end:u64,
+    buf:&'a mut[u8],
+    reader : BufReader<Read>
+}
+
+impl<'a, Read> FileStream<'a, Read>{
+    fn new(file_name:String)->Option<Self>{
+        let f = match File::open(file_name){
+            Ok(handle) => Some(handle),
+            Err(msg) => None
+
+        };
+        if f.is_some(){
+            Some(FileStream{
+                    file_name:file_name,
+                    start: 0,
+                    end: 0,
+                    reader : BufReader::with_capacity(512, f.unwrap()),
+                })
+        }
+        else{
+            None
+        }
+    }
+}
+
+impl<'a, Read> Iterator for FileStream<'a, Read>{
+    type Item = &'a[u8];
+    fn next(&mut self)->Option<Self::Item>{
+        Some(&self.buf[0..]) 
+    }
 }
 
 fn create_data_packet()->Vec<u8>{
