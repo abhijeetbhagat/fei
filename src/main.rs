@@ -90,7 +90,7 @@ fn recv() -> Result<(), Error> {
     println!("rcvr waiting for incoming data");
 
     // Read from the socket
-    let mut buf = [0; 512];
+    let mut buf = [0u8; 516]; //UDP packet is 516 bytes
     let (amt, src) = try!(socket.recv_from(&mut buf));
     match buf[1]{
         3 =>{
@@ -100,14 +100,25 @@ fn recv() -> Result<(), Error> {
                 println!("recvr recvd: {:?}", &buf[0 .. amt]);
                 println!("Last block of the file received");
             }
+            //send ACK
+            
+            let mut high = 0u8;
+            let mut low = 0u8;
+            if block_num <= 0xFF{
+                low = block_size as u8; 
+            }
+            else{
+                low = block_num & 0xFF;
+                high = block_num & 0xFF00; 
+            }
 
+            socket.send_to(&[0,PacketType::ACK as u8, high, low], src); 
         },
         _ => {}
     }
 
     // Print only the valid data (slice)
     println!("recv sending...");
-    socket.send_to(&[5,4,3], src);
 
     Ok(()) 
 }
