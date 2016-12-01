@@ -61,12 +61,13 @@ impl FileStream<std::fs::File>{ //std::fs::File because we are talking concrete 
 impl Iterator for FileStream<std::fs::File>{
     type Item = ([u8;512], usize);
     fn next(&mut self)->Option<Self::Item>{
-        let mut arr = [0;512];
-        let num_bytes_read = self.reader.read(&mut arr);
+        let num_bytes_read = self.reader.read(&mut self.buf);
         println!("{:?}", num_bytes_read);
+        let mut arr = [0;512];
         let mut i = 0usize;
-        for c in self.buf.iter_mut(){
-            *c = arr[i];
+        for c in self.buf.iter(){
+            arr[i] = *c;
+            i += 1; 
         }
         Some((arr, num_bytes_read.unwrap()))
     }
@@ -116,7 +117,14 @@ fn send() -> Result<(), Error> {
     // Send data via the socket
     let mut fs = FileStream::new("/home/abhi/code/rust/fei/target/debug/foo.txt".to_string()).unwrap();
     let (buf, num_bytes_read) = fs.next().unwrap();
-    try!(socket.send_to(&buf, connection2));
+    let mut v = Vec::with_capacity(num_bytes_read + 4);
+    v.push(0);
+    v.push(3);
+    v.push(0);
+    let mut cnt = 0;
+    v.push(cnt);
+    v.extend_from_slice(&buf[0..num_bytes_read]);
+    try!(socket.send_to(v.as_slice(), connection2));
 
     let mut buf  = [0; 10];
     socket.recv_from(&mut buf);
