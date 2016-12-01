@@ -26,15 +26,15 @@ fn create_rrq_wrq_packet(p_type: PacketType, file_name: String, mode : &'static 
     v
 }
 
-struct FileStream<'a, Read>{
+struct FileStream<Read>{
     file_name : String,
     start : u64,
     end:u64,
-    buf:Option<&'a mut[u8]>,
+    buf:[u8;512],
     reader : BufReader<Read>
 }
 
-impl<'a> FileStream<'a, std::fs::File>{ //std::fs::File because we are talking concrete implementation
+impl FileStream<std::fs::File>{ //std::fs::File because we are talking concrete implementation
     fn new(file_name:String)->Option<Self>{
         let f = match std::fs::File::open(file_name.clone()){
             Ok(handle) => Some(handle),
@@ -47,24 +47,25 @@ impl<'a> FileStream<'a, std::fs::File>{ //std::fs::File because we are talking c
                 start: 0,
                 end: 0,
                 reader : BufReader::with_capacity(512, f.unwrap()),
-                buf : None
+                buf : [0;512]
             };
-            //fs.reader.read(&mut buf);
             Some(fs)
         }
         else{
+            println!("cant open file");
             None
         }
     }
 }
 
-impl<'a> Iterator for FileStream<'a, std::fs::File>{
+impl Iterator for FileStream<std::fs::File>{
     type Item = ([u8;512], usize);
     fn next(&mut self)->Option<Self::Item>{
         let mut arr = [0;512];
         let num_bytes_read = self.reader.read(&mut arr);
+        println!("{:?}", num_bytes_read);
         let mut i = 0usize;
-        for c in self.buf.as_mut().unwrap().iter_mut(){
+        for c in self.buf.iter_mut(){
             *c = arr[i];
         }
         Some((arr, num_bytes_read.unwrap()))
@@ -80,13 +81,15 @@ fn create_data_packet()->Vec<u8>{
 fn recv() -> Result<(), Error> { 
     // Define the local connection information 
     let ip = Ipv4Addr::new(127, 0, 0, 1); 
-    let connection = SocketAddrV4::new(ip, 69);
+    let connection = SocketAddrV4::new(ip, 6900);
 
+    println!("rcvr waiting for incoming data");
     // Bind the socket
     let socket = try!(UdpSocket::bind(connection));
+    println!("rcvr waiting for incoming data");
 
     // Read from the socket
-    let mut buf = [0; 10];
+    let mut buf = [0; 512];
     let (amt, src) = try!(socket.recv_from(&mut buf));
 
     // Print only the valid data (slice)
@@ -108,12 +111,12 @@ fn send() -> Result<(), Error> {
     let socket = try!(UdpSocket::bind(connection));
 
     // Define the remote connection (to send the data to)
-    let connection2 = SocketAddrV4::new(ip, 69);
+    let connection2 = SocketAddrV4::new(ip, 6900);
 
     // Send data via the socket
-    let buf = &[0x01, 0x02, 0x03];
-    try!(socket.send_to(buf, connection2));
-    println!("sender sent {:?}", buf);
+    let mut fs = FileStream::new("/home/abhi/code/rust/fei/target/debug/foo.txt".to_string()).unwrap();
+    let (buf, num_bytes_read) = fs.next().unwrap();
+    try!(socket.send_to(&buf, connection2));
 
     let mut buf  = [0; 10];
     socket.recv_from(&mut buf);
@@ -128,7 +131,11 @@ fn main() {
     println!("{}", args[1]);
     if args[1] == "0"{
         println!("passed 0");
-        recv();
+        match recv(){
+            Ok(_) => {},
+            Err(msg) => println!("{}", msg)
+
+        }
     }
     else{
         println!("passed 1");
