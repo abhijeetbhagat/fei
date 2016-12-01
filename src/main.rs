@@ -3,7 +3,7 @@ use std::net::{Ipv4Addr, SocketAddrV4, UdpSocket};
 use std::io::{BufReader, Read, Error};
 use std::fs::File;
 
-#[ repr(u16) ]
+#[ repr(u8) ]
 enum PacketType{
     RRQ = 1,
     WRQ,
@@ -92,9 +92,20 @@ fn recv() -> Result<(), Error> {
     // Read from the socket
     let mut buf = [0; 512];
     let (amt, src) = try!(socket.recv_from(&mut buf));
+    match buf[1]{
+        3 =>{
+            let block_num = buf[3];
+            let block_size = amt - 4;
+            if block_size < 512{
+                println!("recvr recvd: {:?}", &buf[0 .. amt]);
+                println!("Last block of the file received");
+            }
+
+        },
+        _ => {}
+    }
 
     // Print only the valid data (slice)
-    println!("recvr recvd: {:?}", &buf[0 .. amt]);
     println!("recv sending...");
     socket.send_to(&[5,4,3], src);
 
