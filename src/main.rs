@@ -4,20 +4,6 @@ mod udp_interface;
 
 use udp_interface::*;
 
-
-
-/*
-fn create_data_packet()->Vec<u8>{
-
-}
-*/
-
-
-fn send_over_wire(buf : &[u8]){
-    
-
-}
-
 fn main() {
     let args : Vec<_> = std::env::args().collect();
     if args.len() == 1{
@@ -25,6 +11,7 @@ fn main() {
         std::process::exit(0);
     }
 
+    //TODO provide a shell for the user to enter commands like the tftp utility
     let mut endpoint = EndPoint::new(&*args[1]).unwrap();
 
     if args[1] == "0"{
