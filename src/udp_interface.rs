@@ -95,20 +95,21 @@ impl EndPoint{
         println!("sender recvd {:?}", buf);
         Ok(()) 
     }
+
+    fn create_rrq_wrq_packet(p_type: PacketType, file_name: String, mode : &'static str)->Vec<u8>{
+        let mut v = Vec::with_capacity(2+file_name.len()+1+mode.len()+1);
+        v.push(0);
+        v.push(p_type as u8);
+        v.extend(file_name.as_bytes());
+        v.push(0);//zero terminator
+        v.extend(mode.as_bytes());
+        v.push(0);//zero terminator
+        v
+    }
 }
 
 fn get_ip_from(ip : &str) -> Result<Ipv4Addr, AddrParseError>{
     Ipv4Addr::from_str(ip) 
 }
 
-fn create_rrq_wrq_packet(p_type: PacketType, file_name: String, mode : &'static str)->Vec<u8>{
-    let mut v = Vec::with_capacity(2+file_name.len()+1+mode.len()+1);
-    v.push(0);
-    v.push(p_type as u8);
-    v.extend(file_name.as_bytes());
-    v.push(0);//zero terminator
-    v.extend(mode.as_bytes());
-    v.push(0);//zero terminator
-    v
-}
 
