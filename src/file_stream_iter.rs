@@ -37,7 +37,6 @@ impl Iterator for FileStream<File>{
     type Item = ([u8;512], usize);
     fn next(&mut self)->Option<Self::Item>{
         let num_bytes_read = self.reader.read(&mut self.buf);
-        println!("{:?}", num_bytes_read);
         let mut arr = [0;512];
         let mut i = 0usize;
         for c in self.buf.iter(){

@@ -21,17 +21,15 @@ pub fn recv() -> Result<(), Error> {
     let ip = Ipv4Addr::new(127, 0, 0, 1); 
     let connection = SocketAddrV4::new(ip, 6900);
 
-    println!("rcvr waiting for incoming data");
     // Bind the socket
     let socket = try!(UdpSocket::bind(connection));
-    println!("rcvr waiting for incoming data");
 
     // Read from the socket
     let mut buf = [0u8; 516]; //UDP packet is 516 bytes
     let (amt, src) = try!(socket.recv_from(&mut buf));
     match buf[1]{
         3 =>{
-            let block_num = buf[3];
+            let block_num : u16 = 0u16 | (buf[2] as u16) << 8 |  buf[3] as u16;
             let block_size = amt - 4;
             if block_size < 512{
                 println!("recvr recvd: {:?}", &buf[0 .. amt]);
@@ -39,23 +37,14 @@ pub fn recv() -> Result<(), Error> {
             }
             //send ACK
             
-            let mut high = 0u8;
-            let mut low = 0u8;
-            if block_num <= 0xFF{
-                low = block_size as u8; 
-            }
-            else{
-                low = block_num & 0xFF;
-                high = block_num & 0xFF00; 
-            }
+            let low = block_num & 0x00FF;
+            let high = (block_num & 0xFF00) >> 8; 
 
-            socket.send_to(&[0,PacketType::ACK as u8, high, low], src); 
+            socket.send_to(&[0,PacketType::ACK as u8, high as u8, low as u8], src); 
         },
         _ => {}
     }
 
-    // Print only the valid data (slice)
-    println!("recv sending...");
 
     Ok(()) 
 }
@@ -78,8 +67,8 @@ pub fn send() -> Result<(), Error> {
     let mut v = Vec::with_capacity(num_bytes_read + 4);
     v.push(0);
     v.push(3);
-    v.push(0);
-    let mut cnt = 0;
+    v.push(0xFF);
+    let mut cnt = 0xFF;
     v.push(cnt);
     v.extend_from_slice(&buf[0..num_bytes_read]);
     try!(socket.send_to(v.as_slice(), connection2));
