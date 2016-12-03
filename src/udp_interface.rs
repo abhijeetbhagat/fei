@@ -100,7 +100,7 @@ impl EndPoint{
 
     }
 
-    fn create_rrq_wrq_packet(p_type: PacketType, file_name: String, mode : &'static str)->Vec<u8>{
+    fn create_rrq_wrq_packet(&self, p_type: PacketType, file_name: &str, mode : &'static str)->Vec<u8>{
         let mut v = Vec::with_capacity(2+file_name.len()+1+mode.len()+1);
         v.push(0);
         v.push(p_type as u8);
@@ -109,6 +109,38 @@ impl EndPoint{
         v.extend(mode.as_bytes());
         v.push(0);//zero terminator
         v
+    }
+
+    fn get(&mut self, files : &[&str], mode : &'static str){
+        let socket = try!(UdpSocket::bind(self.local_connection));
+        let mut buf  = [0; 516];
+        for file in files{
+            //start with a RRQ
+            let packet = self.create_rrq_wrq_packet(PacketType::RRQ, file, mode);
+            try!(socket.send_to(packet.as_slice(), self.remote_connection));
+
+            let (amt, src) = try!(socket.recv_from(&mut buf));
+            match buf[1]{
+                3 =>{
+                    let block_num : u16 = 0u16 | (buf[2] as u16) << 8 |  buf[3] as u16;
+                    let block_size = amt - 4;
+                    println!("{:?}", block_size);
+                    if block_size < 512{
+                        println!("recvr recvd: {:?}", &buf[0 .. amt]);
+                        println!("Last block of the file received");
+                    }
+                    //send ACK
+
+                    let low = block_num & 0x00FF;
+                    let high = (block_num & 0xFF00) >> 8; 
+
+                    socket.send_to(&[0,PacketType::ACK as u8, high as u8, low as u8], src); 
+                },
+                _ => {}
+            }
+
+
+        } 
     }
 }
 
