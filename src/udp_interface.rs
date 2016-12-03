@@ -96,6 +96,10 @@ impl EndPoint{
         Ok(()) 
     }
 
+    fn send_file(&mut self, filename : &str) {
+
+    }
+
     fn create_rrq_wrq_packet(p_type: PacketType, file_name: String, mode : &'static str)->Vec<u8>{
         let mut v = Vec::with_capacity(2+file_name.len()+1+mode.len()+1);
         v.push(0);
