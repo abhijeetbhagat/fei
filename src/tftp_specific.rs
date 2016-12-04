@@ -8,5 +8,5 @@ pub enum PacketType{
     ERROR
 }
 
-static NETASCII: &'static str = "netascii";
-static OCTET: &'static str = "octet";
+pub static NETASCII: &'static str = "netascii";
+pub static OCTET: &'static str = "octet";

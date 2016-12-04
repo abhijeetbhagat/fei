@@ -3,6 +3,7 @@ mod tftp_specific;
 mod udp_interface;
 
 use udp_interface::*;
+use tftp_specific::*;
 
 fn main() {
     let args : Vec<_> = std::env::args().collect();
@@ -14,14 +15,14 @@ fn main() {
     //TODO provide a shell for the user to enter commands like the tftp utility
     let mut endpoint = EndPoint::new(&*args[1]).unwrap();
 
-    if args[1] == "0"{
-        match endpoint.recv(){
+    if args[2] == "0"{
+        match endpoint.start_listen(){
             Ok(_) => {},
             Err(msg) => println!("{}", msg)
 
         }
     }
     else{
-        endpoint.send();
+        endpoint.get(&["/debug"], OCTET);
     }
 }

@@ -29,7 +29,7 @@ impl EndPoint{
     }
 
 
-    fn start_listen(&mut self)->Result<(), Error>{ 
+    pub fn start_listen(&mut self)->Result<(), Error>{ 
         // Bind the socket
         let socket = try!(UdpSocket::bind(self.local_connection)); 
         
@@ -166,7 +166,7 @@ impl EndPoint{
         v
     }
 
-    fn get(&mut self, files : &[&str], mode : &'static str) -> Result<(), Error>{
+    pub fn get(&mut self, files : &[&str], mode : &'static str) -> Result<(), Error>{
         let socket = try!(UdpSocket::bind(self.local_connection));
         let mut buf  = [0; 516];
         for file in files{
@@ -177,6 +177,7 @@ impl EndPoint{
             loop{
                 //get the first block of the requested file
                 let (amt, src) = try!(socket.recv_from(&mut buf));
+                println!("{:?}", &buf[0..amt]);
                 match buf[1]{
                     3 =>{
                         let block_num : u16 = 0u16 | (buf[2] as u16) << 8 |  buf[3] as u16;
