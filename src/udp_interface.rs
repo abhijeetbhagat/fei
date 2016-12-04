@@ -49,12 +49,7 @@ impl EndPoint{
                 // Send data via the socket
                 let mut fs = FileStream::new(String::from(filename.unwrap())).unwrap();
                 let (mut buf, num_bytes_read) = fs.next().unwrap();
-                let mut v = Vec::with_capacity(num_bytes_read + 4);
-                v.push(0);
-                v.push(PacketType::DATA as u8);
-                v.push((last_blk_id >> 8) as u8);
-                v.push((last_blk_id & 0x00FF) as u8);
-                v.extend_from_slice(&buf[0..num_bytes_read]);
+                let v = self.create_data_packet(last_blk_id, &buf, num_bytes_read);
                 try!(socket.send_to(v.as_slice(), self.remote_connection)); 
                 //TODO start timer here
                 loop{
@@ -63,12 +58,7 @@ impl EndPoint{
                     if buf[1] == 4{
                         last_blk_id += 1;
                         let (buf, num_bytes_read) = fs.next().unwrap();
-                        let mut v = Vec::with_capacity(num_bytes_read + 4);
-                        v.push(0);
-                        v.push(PacketType::DATA as u8);
-                        v.push((last_blk_id >> 8) as u8);
-                        v.push((last_blk_id & 0x00FF) as u8);
-                        v.extend_from_slice(&buf[0..num_bytes_read]);
+                        let v = self.create_data_packet(last_blk_id, &buf, num_bytes_read);
                         try!(socket.send_to(v.as_slice(), self.remote_connection)); 
                     }
                 }
@@ -82,6 +72,16 @@ impl EndPoint{
 
         Ok(())
 
+    }
+
+    fn create_data_packet(&mut self, blk_id : u16, buf : &[u8], num_bytes : usize) -> Vec<u8>{
+        let mut v = Vec::with_capacity(num_bytes + 4);
+        v.push(0);
+        v.push(PacketType::DATA as u8);
+        v.push((blk_id >> 8) as u8);
+        v.push((blk_id & 0x00FF) as u8);
+        v.extend_from_slice(&buf[0..num_bytes]);
+        v 
     }
 
     pub fn recv(&mut self) -> Result<(), Error> { 
