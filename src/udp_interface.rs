@@ -1,5 +1,8 @@
 
 extern crate rand;
+//extern crate time;
+
+//use time::PreciseTime;
 use std::net::{Ipv4Addr, SocketAddrV4, UdpSocket};
 use file_stream_iter::FileStream;
 use std::io::Error;
@@ -34,6 +37,7 @@ impl EndPoint{
         // Read from the socket
         let mut buf = [0u8; 516]; //UDP packet is 516 bytes
         let (amt, src) = try!(socket.recv_from(&mut buf));
+        let mut last_blk_id = 0u16;
         match buf[1]{
             1 => { //RRQ
                 //Get filename to be sent from the packet
@@ -44,16 +48,32 @@ impl EndPoint{
                 let filename = str::from_utf8(&buf[2..i]);
                 // Send data via the socket
                 let mut fs = FileStream::new(String::from(filename.unwrap())).unwrap();
-                let (buf, num_bytes_read) = fs.next().unwrap();
+                let (mut buf, num_bytes_read) = fs.next().unwrap();
                 let mut v = Vec::with_capacity(num_bytes_read + 4);
                 v.push(0);
-                v.push(3);
-                v.push(0xFF);
-                let mut cnt = 0xFF;
-                v.push(cnt);
+                v.push(PacketType::DATA as u8);
+                v.push((last_blk_id >> 8) as u8);
+                v.push((last_blk_id & 0x00FF) as u8);
                 v.extend_from_slice(&buf[0..num_bytes_read]);
-                try!(socket.send_to(v.as_slice(), self.remote_connection));
-
+                try!(socket.send_to(v.as_slice(), self.remote_connection)); 
+                //TODO start timer here
+                loop{
+                    //Get ACK
+                    let (amt, src) = try!(socket.recv_from(&mut buf));
+                    if buf[1] == 4{
+                        last_blk_id += 1;
+                        let (buf, num_bytes_read) = fs.next().unwrap();
+                        let mut v = Vec::with_capacity(num_bytes_read + 4);
+                        v.push(0);
+                        v.push(PacketType::DATA as u8);
+                        v.push((last_blk_id >> 8) as u8);
+                        v.push((last_blk_id & 0x00FF) as u8);
+                        v.extend_from_slice(&buf[0..num_bytes_read]);
+                        try!(socket.send_to(v.as_slice(), self.remote_connection)); 
+                    }
+                }
+            },
+            4 => {
 
 
             },
@@ -162,16 +182,18 @@ impl EndPoint{
                         let block_num : u16 = 0u16 | (buf[2] as u16) << 8 |  buf[3] as u16;
                         let block_size = amt - 4;
                         println!("{:?}", block_size);
-                        if block_size < 512{
-                            println!("recvr recvd: {:?}", &buf[0 .. amt]);
-                            println!("Last block of the file received");
-                        }
+                        
                         //send ACK
-
                         let low = block_num & 0x00FF;
                         let high = (block_num & 0xFF00) >> 8; 
 
                         socket.send_to(&[0,PacketType::ACK as u8, high as u8, low as u8], src); 
+
+                        if block_size < 512{
+                            println!("recvr recvd: {:?}", &buf[0 .. amt]);
+                            println!("Last block of the file received");
+                            break;
+                        }
                     },
                     _ => {}
                 }
