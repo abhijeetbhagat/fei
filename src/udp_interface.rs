@@ -111,7 +111,7 @@ impl EndPoint{
         v
     }
 
-    fn get(&mut self, files : &[&str], mode : &'static str){
+    fn get(&mut self, files : &[&str], mode : &'static str) -> Result<(), Error>{
         let socket = try!(UdpSocket::bind(self.local_connection));
         let mut buf  = [0; 516];
         for file in files{
@@ -119,6 +119,7 @@ impl EndPoint{
             let packet = self.create_rrq_wrq_packet(PacketType::RRQ, file, mode);
             try!(socket.send_to(packet.as_slice(), self.remote_connection));
 
+            //get the first block of the requested file
             let (amt, src) = try!(socket.recv_from(&mut buf));
             match buf[1]{
                 3 =>{
@@ -141,6 +142,8 @@ impl EndPoint{
 
 
         } 
+
+        Ok(())
     }
 }
 
