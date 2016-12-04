@@ -36,11 +36,10 @@ impl EndPoint{
         }
     }
 
-
     pub fn start_listen(&mut self)->Result<(), Error>{ 
         // Bind the socket
         let socket = try!(UdpSocket::bind(self.local_connection)); 
-        
+
         // Start servicing requests from a client
         // Read from the socket
         let mut buf = [0u8; 516]; //UDP packet is 516 bytes
@@ -93,76 +92,6 @@ impl EndPoint{
         v.push((blk_id & 0x00FF) as u8);
         v.extend_from_slice(&buf[0..num_bytes]);
         v 
-    }
-
-    pub fn recv(&mut self) -> Result<(), Error> { 
-        // Define the local connection information 
-        //let ip = Ipv4Addr::new(127, 0, 0, 1); 
-        //TODO we want to use port 69 here
-        //let connection = SocketAddrV4::new(ip, 6900);
-
-        // Bind the socket
-        let socket = try!(UdpSocket::bind(self.local_connection));
-
-        // Read from the socket
-        let mut buf = [0u8; 516]; //UDP packet is 516 bytes
-        let (amt, src) = try!(socket.recv_from(&mut buf));
-        match buf[1]{
-            3 =>{
-                let block_num : u16 = 0u16 | (buf[2] as u16) << 8 |  buf[3] as u16;
-                let block_size = amt - 4;
-                println!("{:?}", block_size);
-                if block_size < 512{
-                    println!("recvr recvd: {:?}", &buf[0 .. amt]);
-                    println!("Last block of the file received");
-                }
-                //send ACK
-
-                let low = block_num & 0x00FF;
-                let high = (block_num & 0xFF00) >> 8; 
-
-                socket.send_to(&[0,PacketType::ACK as u8, high as u8, low as u8], src); 
-            },
-            _ => {}
-        }
-
-
-        Ok(()) 
-    }
-
-    pub fn send(&mut self) -> Result<(), Error> { 
-        // Define the local connection (to send the data from) 
-        //let ip = Ipv4Addr::new(127, 0, 0, 1); 
-        //TODO generate port # using rand
-        //let connection = SocketAddrV4::new(ip, 9992);
-
-        // Bind the socket
-        let socket = try!(UdpSocket::bind(self.local_connection));
-
-        // Define the remote connection (to send the data to)
-        //let connection2 = SocketAddrV4::new(ip, 6900);
-
-        // Send data via the socket
-        let mut fs = FileStream::new("/home/abhi/code/rust/fei/target/debug/foo.txt".to_string()).unwrap();
-        let (buf, num_bytes_read) = fs.next().unwrap();
-        let mut v = Vec::with_capacity(num_bytes_read + 4);
-        v.push(0);
-        v.push(3);
-        v.push(0xFF);
-        let mut cnt = 0xFF;
-        v.push(cnt);
-        v.extend_from_slice(&buf[0..num_bytes_read]);
-        try!(socket.send_to(v.as_slice(), self.remote_connection.unwrap()));
-
-        let mut buf  = [0; 10];
-        socket.recv_from(&mut buf);
-
-        println!("sender recvd {:?}", buf);
-        Ok(()) 
-    }
-
-    fn send_file(&mut self, filename : &str) {
-
     }
 
     fn create_rrq_wrq_packet(&self, p_type: PacketType, file_name: &str, mode : &'static str)->Vec<u8>{
