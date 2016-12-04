@@ -7,7 +7,7 @@ use tftp_specific::PacketType;
 use std::str::FromStr;
 use std::net::AddrParseError;
 use std::error;
-
+use std::str;
 
 pub struct EndPoint{
     local_connection : SocketAddrV4,
@@ -26,7 +26,41 @@ impl EndPoint{
     }
 
 
-    fn start_listen(){
+    fn start_listen(&mut self)->Result<(), Error>{ 
+        // Bind the socket
+        let socket = try!(UdpSocket::bind(self.local_connection)); 
+        
+        // Start servicing requests from a client
+        // Read from the socket
+        let mut buf = [0u8; 516]; //UDP packet is 516 bytes
+        let (amt, src) = try!(socket.recv_from(&mut buf));
+        match buf[1]{
+            1 => { //RRQ
+                //Get filename to be sent from the packet
+                let mut  i = 2;
+                while buf[i] != '\0' as u8{
+                    i += 1;
+                }
+                let filename = str::from_utf8(&buf[2..i]);
+                // Send data via the socket
+                let mut fs = FileStream::new(String::from(filename.unwrap())).unwrap();
+                let (buf, num_bytes_read) = fs.next().unwrap();
+                let mut v = Vec::with_capacity(num_bytes_read + 4);
+                v.push(0);
+                v.push(3);
+                v.push(0xFF);
+                let mut cnt = 0xFF;
+                v.push(cnt);
+                v.extend_from_slice(&buf[0..num_bytes_read]);
+                try!(socket.send_to(v.as_slice(), self.remote_connection));
+
+
+
+            },
+            _ => {panic!("unrecognized packet type")}
+        }
+
+        Ok(())
 
     }
 
