@@ -13,7 +13,12 @@ fn main() {
     }
 
     //TODO provide a shell for the user to enter commands like the tftp utility
-    let mut endpoint = EndPoint::new(&*args[1]).unwrap();
+    
+    let mut endpoint = if args[2] == "0"{
+                            EndPoint::new(&*args[1], "", true).unwrap()
+                        }else{
+                            EndPoint::new(&*args[1], "", false).unwrap()
+                        };
 
     if args[2] == "0"{
         match endpoint.start_listen(){
@@ -23,6 +28,6 @@ fn main() {
         }
     }
     else{
-        endpoint.get(&["/debug"], OCTET);
+        endpoint.get(&["/home/abhi/code/rust/fei/target/debug/foo.txt"], OCTET);
     }
 }

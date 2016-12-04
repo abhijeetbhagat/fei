@@ -14,18 +14,26 @@ use std::str;
 
 pub struct EndPoint{
     local_connection : SocketAddrV4,
-    remote_connection : SocketAddrV4 
+    remote_connection : Option<SocketAddrV4> 
 }
 
 impl EndPoint{
 
-    pub fn new(remote : &str) -> Result<EndPoint, AddrParseError>{
+    pub fn new(remote : &str, port : &str, is_server : bool) -> Result<EndPoint, AddrParseError>{
 
         let ipv4 = try!(get_ip_from(remote));
-        Ok(EndPoint{
-            local_connection : SocketAddrV4::new(Ipv4Addr::new(127,0,0,1), 6900),
-            remote_connection : SocketAddrV4::new(ipv4, 9990) 
-        })
+        if is_server{
+            Ok(EndPoint{
+                local_connection : SocketAddrV4::new(Ipv4Addr::new(127,0,0,1), 6900),
+                remote_connection : None 
+            })
+        }
+        else{
+            Ok(EndPoint{
+                local_connection : SocketAddrV4::new(Ipv4Addr::new(127,0,0,1), 9990),
+                remote_connection : Some(SocketAddrV4::new(ipv4, 6900)) 
+            })
+        }
     }
 
 
@@ -40,26 +48,29 @@ impl EndPoint{
         let mut last_blk_id = 0u16;
         match buf[1]{
             1 => { //RRQ
+                println!("RRQ received");
                 //Get filename to be sent from the packet
                 let mut  i = 2;
                 while buf[i] != '\0' as u8{
                     i += 1;
                 }
                 let filename = str::from_utf8(&buf[2..i]);
+                println!("file requested: {}", filename.unwrap());
                 // Send data via the socket
                 let mut fs = FileStream::new(String::from(filename.unwrap())).unwrap();
                 let (mut buf, num_bytes_read) = fs.next().unwrap();
                 let v = self.create_data_packet(last_blk_id, &buf, num_bytes_read);
-                try!(socket.send_to(v.as_slice(), self.remote_connection)); 
+                try!(socket.send_to(v.as_slice(), src)); 
                 //TODO start timer here
                 loop{
                     //Get ACK
                     let (amt, src) = try!(socket.recv_from(&mut buf));
                     if buf[1] == 4{
+                        println!("ACK received");
                         last_blk_id += 1;
                         let (buf, num_bytes_read) = fs.next().unwrap();
                         let v = self.create_data_packet(last_blk_id, &buf, num_bytes_read);
-                        try!(socket.send_to(v.as_slice(), self.remote_connection)); 
+                        try!(socket.send_to(v.as_slice(), src)); 
                     }
                 }
             },
@@ -141,7 +152,7 @@ impl EndPoint{
         let mut cnt = 0xFF;
         v.push(cnt);
         v.extend_from_slice(&buf[0..num_bytes_read]);
-        try!(socket.send_to(v.as_slice(), self.remote_connection));
+        try!(socket.send_to(v.as_slice(), self.remote_connection.unwrap()));
 
         let mut buf  = [0; 10];
         socket.recv_from(&mut buf);
@@ -171,30 +182,31 @@ impl EndPoint{
         let mut buf  = [0; 516];
         for file in files{
             //start with a RRQ
+            println!("sending RRQ request");
             let packet = self.create_rrq_wrq_packet(PacketType::RRQ, file, mode);
-            try!(socket.send_to(packet.as_slice(), self.remote_connection));
+            try!(socket.send_to(packet.as_slice(), self.remote_connection.unwrap()));
 
             loop{
                 //get the first block of the requested file
                 let (amt, src) = try!(socket.recv_from(&mut buf));
-                println!("{:?}", &buf[0..amt]);
+                println!("Received block");
+                //println!("{:?}", &buf[0..amt]);
                 match buf[1]{
                     3 =>{
                         let block_num : u16 = 0u16 | (buf[2] as u16) << 8 |  buf[3] as u16;
                         let block_size = amt - 4;
                         println!("{:?}", block_size);
+                        if block_size == 0{
+                            break;
+                        }
                         
                         //send ACK
                         let low = block_num & 0x00FF;
                         let high = (block_num & 0xFF00) >> 8; 
 
+                        println!("Sending ACK");
                         socket.send_to(&[0,PacketType::ACK as u8, high as u8, low as u8], src); 
 
-                        if block_size < 512{
-                            println!("recvr recvd: {:?}", &buf[0 .. amt]);
-                            println!("Last block of the file received");
-                            break;
-                        }
                     },
                     _ => {}
                 }
