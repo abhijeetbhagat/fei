@@ -58,7 +58,7 @@ pub struct FileStreamWriter<W : Write>{
 
 impl FileStreamWriter<File>{
     pub fn new(file_name:String)->Option<Self>{
-        let f = match OpenOptions::new().append(true).open(file_name.clone()){
+        let f = match OpenOptions::new().create(true).append(true).open(file_name.clone()){
             Ok(handle) => Some(handle),
             Err(msg) => None
 
@@ -79,8 +79,14 @@ impl FileStreamWriter<File>{
         }
     }
 
-    fn append(&mut self, buf : &[u8]) -> Result<(), Error>{
+    pub fn append(&mut self, buf : &[u8]) -> Result<(), Error>{
+        assert!(buf.len() <= 512);
+        self.writer.write(buf);
         Ok(())
+    }
+
+    pub fn close(&mut self){
+        self.writer.flush();
     }
 }
 
