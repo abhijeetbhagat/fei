@@ -2,10 +2,14 @@ mod file_stream_iter;
 mod tftp_specific;
 mod stop_watch;
 mod udp_interface;
+mod utils;
 
 use udp_interface::*;
 use tftp_specific::*;
 use std::io::{Write, Read};
+use utils::*;
+extern crate regex;
+use regex::Regex;
 
 fn main() {
     println!("This is fei. A TFTP server+client. Written by abhijeetbhagat.");
