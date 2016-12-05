@@ -1,35 +1,29 @@
-enum TFTPCommand{
+use regex::Regex;
+pub enum TFTPCommand{
     GET,
     PUT
 }
 
-struct Parser{
-    cur_token : String 
+pub struct Parser{
+    get_regex : Regex,
+    put_regex : Regex,
 }
 
 impl Parser{
-    fn new()->Self{
+    pub fn new()->Self{
         Parser{
+            get_regex : Regex::new(r"get\s([\w\s]+)").unwrap(),
+            put_regex : Regex::new(r"put\s[\w\s]+").unwrap(),
 
         }
     }
 
-    fn parse(&mut self, input : &str) -> Result<(TFTPCommand, Option<Vec<&str>>), String>{
-        for i in input.chars(){
-            match i{
-                ' ' => {
-
-
-                },
-                'a' ...'z' => {
-                },
-                '0' ...'9' => {
-
-                },
-                _ => {}
-            }
+    pub fn parse(&mut self, input : &str) -> Result<(TFTPCommand, Option<Vec<&str>>), String>{
+        if self.get_regex.is_match(input){
+            let c = self.get_regex.captures(input).unwrap();
+            println!("{}", c.len());
+            println!("{:?}", c.at(1));
         }
-
         Err("".to_string())
     } 
 }

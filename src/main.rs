@@ -3,6 +3,7 @@ mod tftp_specific;
 mod stop_watch;
 mod udp_interface;
 mod utils;
+mod command_parser;
 
 use udp_interface::*;
 use tftp_specific::*;
@@ -10,6 +11,7 @@ use std::io::{Write, Read};
 use utils::*;
 extern crate regex;
 use regex::Regex;
+use command_parser::Parser;
 
 fn main() {
     println!("This is fei. A TFTP server+client. Written by abhijeetbhagat.");
@@ -42,7 +44,9 @@ fn main() {
             if *&input == "q\n" || *&input == "quit\n" {
                 break;
             }
-            endpoint.get(&["/home/abhi/code/rust/fei/target/debug/foo.txt"], OCTET);
+            let mut p = Parser::new();
+            p.parse(&input);
+            //endpoint.get(&["/home/abhi/code/rust/fei/target/debug/foo.txt"], OCTET);
 
         }
     }
