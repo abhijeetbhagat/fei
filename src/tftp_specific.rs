@@ -1,11 +1,11 @@
 
 #[ repr(u8) ]
-pub enum PacketType{
+pub enum PacketType {
     RRQ = 1,
     WRQ,
     DATA,
     ACK,
-    ERROR
+    ERROR,
 }
 
 pub static NETASCII: &'static str = "netascii";
