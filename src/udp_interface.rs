@@ -4,7 +4,7 @@ extern crate rand;
 
 //use time::PreciseTime;
 use std::net::{Ipv4Addr, SocketAddrV4, UdpSocket};
-use file_stream_iter::FileStreamReader;
+use file_stream_iter::{FileStreamReader, FileStreamWriter};
 use std::io::Error;
 use tftp_specific::PacketType;
 use std::str::FromStr;
@@ -115,20 +115,27 @@ impl EndPoint{
             println!("sending RRQ request");
             let packet = self.create_rrq_wrq_packet(PacketType::RRQ, file, mode);
             try!(socket.send_to(packet.as_slice(), self.remote_connection.unwrap()));
+            //TODO remove the hardcoded filename
+            let mut writer = FileStreamWriter::new(String::from("/home/abhi/code/rust/fei/target/debug/bar.txt")).unwrap();
 
             loop{
                 //get the first block of the requested file
                 let (amt, src) = try!(socket.recv_from(&mut buf));
                 println!("Received block");
-                //println!("{:?}", &buf[0..amt]);
+                println!("Total bytes read {}", amt);
+
                 match buf[1]{
                     3 =>{
-                        let block_num : u16 = 0u16 | (buf[2] as u16) << 8 |  buf[3] as u16;
                         let block_size = amt - 4;
-                        println!("{:?}", block_size);
+                        println!("File block size is {:?}", block_size);
                         if block_size == 0{
+                            println!("Empty block recvd");
+                            writer.close();
                             break;
                         }
+                        println!("Appending to file");
+                        writer.append(&buf[4..4+block_size]);
+                        let block_num : u16 = 0u16 | (buf[2] as u16) << 8 |  buf[3] as u16;
                         
                         //send ACK
                         let low = block_num & 0x00FF;
