@@ -4,7 +4,7 @@ extern crate rand;
 
 //use time::PreciseTime;
 use std::net::{Ipv4Addr, SocketAddrV4, UdpSocket};
-use file_stream_iter::FileStream;
+use file_stream_iter::FileStreamReader;
 use std::io::Error;
 use tftp_specific::PacketType;
 use std::str::FromStr;
@@ -14,6 +14,7 @@ use std::str;
 
 pub struct EndPoint{
     local_connection : SocketAddrV4,
+    //A server doesn't need a remote_connection
     remote_connection : Option<SocketAddrV4> 
 }
 
@@ -56,7 +57,7 @@ impl EndPoint{
                 let filename = str::from_utf8(&buf[2..i]);
                 println!("file requested: {}", filename.unwrap());
                 // Send data via the socket
-                let mut fs = FileStream::new(String::from(filename.unwrap())).unwrap();
+                let mut fs = FileStreamReader::new(String::from(filename.unwrap())).unwrap();
                 let (mut buf, num_bytes_read) = fs.next().unwrap();
                 let v = self.create_data_packet(last_blk_id, &buf, num_bytes_read);
                 try!(socket.send_to(v.as_slice(), src)); 
