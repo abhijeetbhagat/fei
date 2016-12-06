@@ -25,6 +25,7 @@ fn main() {
     // TODO provide a shell for the user to enter commands like the tftp utility
 
     let mut endpoint = if args[1] == "-s" {
+        println!("Running fei as server");
         EndPoint::new("127.0.0.1", "", true).unwrap()
     } else {
         EndPoint::new(&*args[1], "", false).unwrap()

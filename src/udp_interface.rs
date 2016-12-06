@@ -11,6 +11,7 @@ use std::str::FromStr;
 use std::net::AddrParseError;
 use std::error;
 use std::str;
+use std::path::Path;
 
 pub struct EndPoint {
     local_connection: SocketAddrV4,
@@ -116,9 +117,12 @@ impl EndPoint {
             let packet = self.create_rrq_wrq_packet(PacketType::RRQ, file, mode);
             try!(socket.send_to(packet.as_slice(), self.remote_connection.unwrap()));
             // TODO remove the hardcoded filename
+            let path = Path::new(file);
+
+            println!("Downloading as ./{}", path.file_name().unwrap().to_str().unwrap());
+            //TODO fix downloading very file in the current dir
             let mut writer =
-                FileStreamWriter::new(String::from("/home/abhi/code/rust/fei/target/debug/bar.\
-                                                    txt"))
+                FileStreamWriter::new(format!("./{}", path.file_name().unwrap().to_str().unwrap()))
                     .unwrap();
 
             loop {

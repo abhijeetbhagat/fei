@@ -14,7 +14,7 @@ pub struct Parser{
 impl Parser{
     pub fn new()->Self{
         Parser{
-            get_regex : Regex::new(r"get\s([\w\s]+)").unwrap(),
+            get_regex : Regex::new(r"get\s([a-z0-9/.]+\s+)").unwrap(),
             put_regex : Regex::new(r"put\s[\w\s]+").unwrap(),
 
         }
@@ -26,7 +26,10 @@ impl Parser{
             println!("{}", c.len());
             println!("{:?}", c.at(1));
             return Ok((TFTPCommand::GET, Some(c.at(1).unwrap().split_whitespace().collect())))
+        } else {
+            //panic!("no match");
         }
+        
         Err("".to_string())
     } 
 }
