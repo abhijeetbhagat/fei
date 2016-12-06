@@ -1,4 +1,6 @@
 use regex::Regex;
+
+#[derive(PartialEq)]
 pub enum TFTPCommand{
     GET,
     PUT
@@ -18,11 +20,12 @@ impl Parser{
         }
     }
 
-    pub fn parse(&mut self, input : &str) -> Result<(TFTPCommand, Option<Vec<&str>>), String>{
+    pub fn parse<'a>(&'a mut self, input : &'a str) -> Result<(TFTPCommand, Option<Vec<&str>>), String>{
         if self.get_regex.is_match(input){
             let c = self.get_regex.captures(input).unwrap();
             println!("{}", c.len());
             println!("{:?}", c.at(1));
+            return Ok((TFTPCommand::GET, Some(c.at(1).unwrap().split_whitespace().collect())))
         }
         Err("".to_string())
     } 

@@ -11,7 +11,7 @@ use std::io::{Write, Read};
 use utils::*;
 extern crate regex;
 use regex::Regex;
-use command_parser::Parser;
+use command_parser::{TFTPCommand, Parser};
 
 fn main() {
     println!("This is fei. A TFTP server+client. Written by abhijeetbhagat.");
@@ -45,8 +45,13 @@ fn main() {
                 break;
             }
             let mut p = Parser::new();
-            p.parse(&input);
-            //endpoint.get(&["/home/abhi/code/rust/fei/target/debug/foo.txt"], OCTET);
+            let (command, files) = p.parse(&input).unwrap();
+            assert!(command == TFTPCommand::GET);
+            assert!(files.is_some());
+            println!("{:?}", files);
+            if files.is_some(){
+                endpoint.get(&files.unwrap(), OCTET);
+            }
 
         }
     }
