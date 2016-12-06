@@ -14,7 +14,7 @@ pub struct Parser{
 impl Parser{
     pub fn new()->Self{
         Parser{
-            get_regex : Regex::new(r"get\s([a-z0-9/.]+\s+)").unwrap(),
+            get_regex : Regex::new(r"get\s([~a-z0-9/.]+\s+)").unwrap(),
             put_regex : Regex::new(r"put\s[\w\s]+").unwrap(),
 
         }

@@ -73,7 +73,19 @@ impl EndPoint {
                         try!(socket.send_to(v.as_slice(), src));
                     }
                 }
-            }
+            },
+            2 => {
+                //WRQ
+                println!("WRQ received");
+                //send ACK
+                let mut block_num = 0u16;
+                let low = block_num & 0x00FF;
+                let high = (block_num & 0xFF00) >> 8;
+
+                println!("Sending ACK");
+                socket.send_to(&[0, PacketType::ACK as u8, high as u8, low as u8], src);
+
+            },
             4 => {}
             _ => panic!("unrecognized packet type"),
         }
