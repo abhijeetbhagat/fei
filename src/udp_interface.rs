@@ -77,6 +77,12 @@ impl EndPoint {
             2 => {
                 //WRQ
                 println!("WRQ received");
+                let mut i = 2;
+                while buf[i] != '\0' as u8 {
+                    i += 1;
+                }
+                let filename = str::from_utf8(&buf[2..i]);
+                println!("file requested: {}", filename.unwrap());
                 //send ACK
                 let mut block_num = 0u16;
                 let low = block_num & 0x00FF;
