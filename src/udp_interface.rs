@@ -6,7 +6,7 @@ extern crate rand;
 use std::net::{Ipv4Addr, SocketAddrV4, UdpSocket};
 use file_stream_iter::{FileStreamReader, FileStreamWriter};
 use std::io::Error;
-use tftp_specific::PacketType;
+use tftp_specific::{ErrorCode, PacketType};
 use std::str::FromStr;
 use std::net::AddrParseError;
 use std::error;
@@ -116,6 +116,17 @@ impl EndPoint {
 
         Ok(())
 
+    }
+
+    fn create_error_packet(&mut self, error_code: ErrorCode, err_msg : &str)->Vec<u8>{
+        let mut v = Vec::with_capacity(2+2+err_msg.len()+1);
+        v.push(0);
+        v.push(PacketType::ERROR as u8);
+        v.push(0);
+        v.push(error_code as u8);
+        v.extend_from_slice(err_msg.as_bytes());
+        v.push('\0' as u8);
+        v 
     }
 
     fn clear_buf(buf : &mut[u8]){
