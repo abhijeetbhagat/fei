@@ -156,9 +156,8 @@ impl EndPoint {
         v.push(p_type as u8);
         v.extend(file_name.as_bytes());
         v.push('\0' as u8);
-        v.push(0);//zero terminator
         v.extend(mode.as_bytes());
-        v.push(0);//zero terminator
+        v.push('\0');//zero terminator
         v
     }
 
