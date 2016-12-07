@@ -81,15 +81,31 @@ impl EndPoint {
                 while buf[i] != '\0' as u8 {
                     i += 1;
                 }
-                let filename = str::from_utf8(&buf[2..i]);
+                let mut v = vec![];
+                v.copy_from_slice(&buf[2..i]);
+                let filename = str::from_utf8(v.as_slice());
                 println!("file requested: {}", filename.unwrap());
+                let mut writer = FileStreamWriter::new(String::from(filename.unwrap())).unwrap();
                 //send ACK
                 let mut block_num = 0u16;
-                let low = block_num & 0x00FF;
-                let high = (block_num & 0xFF00) >> 8;
+                loop{
+                    let low = block_num & 0x00FF;
+                    let high = (block_num & 0xFF00) >> 8;
 
-                println!("Sending ACK");
-                socket.send_to(&[0, PacketType::ACK as u8, high as u8, low as u8], src);
+                    println!("Sending ACK");
+                    socket.send_to(&[0, PacketType::ACK as u8, high as u8, low as u8], src);
+
+                    Self::clear_buf(&mut buf);
+                    let (amt, src) = try!(socket.recv_from(&mut buf));
+                    
+                    writer.append(&mut buf);
+                    if amt - 4 < 512{
+                        //TODO do we close writer here?
+                        break;
+                    }
+                    block_num += 1;
+
+                }
 
             },
             4 => {}
@@ -98,6 +114,13 @@ impl EndPoint {
 
         Ok(())
 
+    }
+
+    fn clear_buf(buf : &mut[u8]){
+        assert!(buf.len() == 516);
+        for i in 0..516{
+            buf[i] = 0;
+        }
     }
 
     fn create_data_packet(&mut self, blk_id: u16, buf: &[u8], num_bytes: usize) -> Vec<u8> {
