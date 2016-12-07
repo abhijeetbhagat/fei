@@ -5,13 +5,14 @@ extern crate rand;
 // use time::PreciseTime;
 use std::net::{Ipv4Addr, SocketAddrV4, UdpSocket};
 use file_stream_iter::{FileStreamReader, FileStreamWriter};
-use std::io::Error;
+use std::io::{ErrorKind, Error};
 use tftp_specific::{ErrorCode, PacketType};
 use std::str::FromStr;
 use std::net::AddrParseError;
 use std::error;
 use std::str;
 use std::path::Path;
+use std::time::Duration;
 
 pub struct EndPoint {
     local_connection: SocketAddrV4,
@@ -60,17 +61,29 @@ impl EndPoint {
                 let mut fs = FileStreamReader::new(String::from(filename.unwrap())).unwrap();
                 let (mut buf, num_bytes_read) = fs.next().unwrap();
                 let v = self.create_data_packet(last_blk_id, &buf, num_bytes_read);
+                let mut time_out = 3; //3 secs
+                socket.set_read_timeout(Some(Duration::new(time_out, 0)));
                 try!(socket.send_to(v.as_slice(), src));
                 // TODO start timer here
                 loop {
                     // Get ACK
-                    let (amt, src) = try!(socket.recv_from(&mut buf));
-                    if buf[1] == 4 {
-                        println!("ACK received");
-                        last_blk_id += 1;
-                        let (buf, num_bytes_read) = fs.next().unwrap();
-                        let v = self.create_data_packet(last_blk_id, &buf, num_bytes_read);
-                        try!(socket.send_to(v.as_slice(), src));
+                    match (socket.recv_from(&mut buf)){
+                        Ok((amt, src)) => {
+                            if buf[1] == 4 {
+                                println!("ACK received");
+                                last_blk_id += 1;
+                                let (buf, num_bytes_read) = fs.next().unwrap();
+                                let v = self.create_data_packet(last_blk_id, &buf, num_bytes_read);
+                                try!(socket.send_to(v.as_slice(), src));
+                            } 
+                        },
+                        Err(ref e) if e.kind() == ErrorKind::TimedOut => {
+                            time_out += 3;
+                            socket.set_read_timeout(Some(Duration::new(time_out, 0)));
+                        },
+                        Err(e) => {
+
+                        }
                     }
                 }
             },
@@ -98,15 +111,20 @@ impl EndPoint {
                     socket.send_to(&[0, PacketType::ACK as u8, high as u8, low as u8], src);
 
                     Self::clear_buf(&mut buf);
-                    let (amt, src) = try!(socket.recv_from(&mut buf));
-                    
-                    writer.append(&mut buf);
-                    if amt - 4 < 512{
-                        //TODO do we close writer here?
-                        break;
-                    }
-                    block_num += 1;
-
+                    match (socket.recv_from(&mut buf)){
+                        Ok((amt, src)) => { 
+                            writer.append(&mut buf);
+                            if amt - 4 < 512{
+                                //TODO do we close writer here?
+                                break;
+                            }
+                            block_num += 1;
+                        },
+                        Err(ref e) if e.kind() == ErrorKind::TimedOut => {
+                            //TODO increase timeout
+                        },  
+                        Err(e) => {}  // bail out
+                    } 
                 }
 
             },
@@ -157,7 +175,7 @@ impl EndPoint {
         v.extend(file_name.as_bytes());
         v.push('\0' as u8);
         v.extend(mode.as_bytes());
-        v.push('\0');//zero terminator
+        v.push('\0' as u8);//zero terminator
         v
     }
 
