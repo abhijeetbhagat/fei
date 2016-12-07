@@ -81,6 +81,8 @@ impl EndPoint {
                 while buf[i] != '\0' as u8 {
                     i += 1;
                 }
+
+                //TODO fix the vec use to copy slice from buf
                 let mut v = vec![];
                 v.copy_from_slice(&buf[2..i]);
                 let filename = str::from_utf8(v.as_slice());
