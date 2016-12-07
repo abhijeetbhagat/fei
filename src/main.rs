@@ -37,6 +37,7 @@ fn main() {
             Err(msg) => println!("{}", msg),
         }
     } else {
+        let mut p = Parser::new();
         loop {
             print!("fei> ");
             std::io::stdout().flush().unwrap();
@@ -45,7 +46,6 @@ fn main() {
             if *&input == "q\n" || *&input == "quit\n" {
                 break;
             }
-            let mut p = Parser::new();
             let (command, files) = p.parse(&input).unwrap();
             assert!(command == TFTPCommand::GET);
             assert!(files.is_some());
@@ -53,7 +53,6 @@ fn main() {
             if files.is_some(){
                 endpoint.get(&files.unwrap(), OCTET);
             }
-
         }
     }
 }
