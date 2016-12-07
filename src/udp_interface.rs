@@ -13,6 +13,7 @@ use std::error;
 use std::str;
 use std::path::Path;
 use std::time::Duration;
+use utils;
 
 pub struct EndPoint {
     local_connection: SocketAddrV4,
@@ -51,10 +52,7 @@ impl EndPoint {
                 // RRQ
                 println!("RRQ received");
                 // Get filename to be sent from the packet
-                let mut i = 2;
-                while buf[i] != '\0' as u8 {
-                    i += 1;
-                }
+                let i = utils::get_terminator_position(&buf[2..]);
                 let filename = str::from_utf8(&buf[2..i]);
                 println!("file requested: {}", filename.unwrap());
                 // Send data via the socket
@@ -67,10 +65,11 @@ impl EndPoint {
                 // TODO start timer here
                 loop {
                     // Get ACK
-                    match (socket.recv_from(&mut buf)){
+                    match socket.recv_from(&mut buf){
                         Ok((amt, src)) => {
                             if buf[1] == 4 {
                                 println!("ACK received");
+                                //TODO verify the ACK received was for the last block id 
                                 last_blk_id += 1;
                                 let (buf, num_bytes_read) = fs.next().unwrap();
                                 let v = self.create_data_packet(last_blk_id, &buf, num_bytes_read);
@@ -90,10 +89,7 @@ impl EndPoint {
             2 => {
                 //WRQ
                 println!("WRQ received");
-                let mut i = 2;
-                while buf[i] != '\0' as u8 {
-                    i += 1;
-                }
+                let i = utils::get_terminator_position(&buf[2..]);
 
                 //TODO fix the vec use to copy slice from buf
                 let mut v = vec![];
@@ -103,6 +99,7 @@ impl EndPoint {
                 let mut writer = FileStreamWriter::new(String::from(filename.unwrap())).unwrap();
                 //send ACK
                 let mut block_num = 0u16;
+                let mut time_out = 3;
                 loop{
                     let low = block_num & 0x00FF;
                     let high = (block_num & 0xFF00) >> 8;
@@ -111,17 +108,18 @@ impl EndPoint {
                     socket.send_to(&[0, PacketType::ACK as u8, high as u8, low as u8], src);
 
                     Self::clear_buf(&mut buf);
-                    match (socket.recv_from(&mut buf)){
+                    match socket.recv_from(&mut buf){
                         Ok((amt, src)) => { 
                             writer.append(&mut buf);
                             if amt - 4 < 512{
-                                //TODO do we close writer here?
+                                writer.close();
                                 break;
                             }
                             block_num += 1;
                         },
                         Err(ref e) if e.kind() == ErrorKind::TimedOut => {
-                            //TODO increase timeout
+                            time_out += 3;
+                            socket.set_read_timeout(Some(Duration::new(time_out, 0)));
                         },  
                         Err(e) => {}  // bail out
                     } 
