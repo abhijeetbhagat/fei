@@ -52,8 +52,8 @@ impl EndPoint {
                 // RRQ
                 println!("RRQ received");
                 // Get filename to be sent from the packet
-                let i = utils::get_terminator_position(&buf[2..]);
-                let filename = str::from_utf8(&buf[2..i]);
+                let i = utils::get_terminator_position(&buf[2..amt-2]);
+                let filename = str::from_utf8(&buf[2..2+i]);
                 println!("file requested: {}", filename.unwrap());
                 // Send data via the socket
                 let mut fs = FileStreamReader::new(String::from(filename.unwrap())).unwrap();
