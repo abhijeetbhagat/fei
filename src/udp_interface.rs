@@ -92,8 +92,9 @@ impl EndPoint {
                 let i = utils::get_terminator_position(&buf[2..]);
 
                 //TODO fix the vec use to copy slice from buf
-                let mut v = vec![];
-                v.copy_from_slice(&buf[2..i]);
+                let mut v = vec![0;i];
+                //panic!("{}, {}", v.len(), &buf[2..2+i].len());
+                v.copy_from_slice(&buf[2..2+i]);
                 let filename = str::from_utf8(v.as_slice());
                 println!("file requested: {}", filename.unwrap());
                 let mut writer = FileStreamWriter::new(String::from(filename.unwrap())).unwrap();
@@ -110,8 +111,9 @@ impl EndPoint {
                     Self::clear_buf(&mut buf);
                     match socket.recv_from(&mut buf){
                         Ok((amt, src)) => { 
-                            writer.append(&mut buf);
-                            if amt - 4 < 512{
+                            let block_size = amt - 4;
+                            writer.append(&buf[4..4 + block_size]);
+                            if block_size < 512{
                                 writer.close();
                                 break;
                             }
@@ -185,7 +187,6 @@ impl EndPoint {
             println!("sending RRQ request");
             let packet = self.create_rrq_wrq_packet(PacketType::RRQ, file, mode);
             try!(socket.send_to(packet.as_slice(), self.remote_connection.unwrap()));
-            // TODO remove the hardcoded filename
             let path = Path::new(file);
 
             println!("Downloading as ./{}", path.file_name().unwrap().to_str().unwrap());
@@ -231,6 +232,49 @@ impl EndPoint {
             }
 
 
+        }
+
+        Ok(())
+    }
+
+    pub fn put(&mut self, files: &[&str], mode: &'static str) -> Result<(), Error>{
+        let socket = try!(UdpSocket::bind(self.local_connection));
+        let mut buf = [0; 516];
+        for file in files {
+            // start with a WRQ
+            println!("sending WRQ request");
+            let packet = self.create_rrq_wrq_packet(PacketType::WRQ, file, mode);
+            try!(socket.send_to(packet.as_slice(), self.remote_connection.unwrap()));
+            let path = Path::new(file);
+
+            println!("Uploading as ./{}", path.file_name().unwrap().to_str().unwrap());
+            //TODO fix uploadin every file in the current dir of the server
+            let mut reader =
+                FileStreamReader::new(format!("./{}", path.file_name().unwrap().to_str().unwrap()))
+                    .unwrap();
+            let mut time_out = 3;
+            let mut last_blk_id = 0u16;
+            loop{
+                match socket.recv_from(&mut buf){
+                    Ok((amt, src)) => {
+                        if buf[1] == 4 {
+                            println!("ACK received");
+                            //TODO verify the ACK received was for the last block id 
+                            last_blk_id += 1;
+                            let (buf, num_bytes_read) = reader.next().unwrap();
+                            let v = self.create_data_packet(last_blk_id, &buf, num_bytes_read);
+                            try!(socket.send_to(v.as_slice(), src));
+                        } 
+                    },
+                    Err(ref e) if e.kind() == ErrorKind::TimedOut => {
+                        time_out += 3;
+                        socket.set_read_timeout(Some(Duration::new(time_out, 0)));
+                    },
+                    Err(e) => {
+
+                    }
+                }
+            }
         }
 
         Ok(())

@@ -47,11 +47,12 @@ fn main() {
                 break;
             }
             let (command, files) = p.parse(&input).unwrap();
-            assert!(command == TFTPCommand::GET);
-            assert!(files.is_some());
             println!("{:?}", files);
             if files.is_some(){
-                endpoint.get(&files.unwrap(), OCTET);
+                match command{
+                    TFTPCommand::GET => {endpoint.get(&files.unwrap(), OCTET);},
+                    TFTPCommand::PUT => {endpoint.put(&files.unwrap(), OCTET);}
+                }
             }
         }
     }
