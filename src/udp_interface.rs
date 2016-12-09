@@ -13,27 +13,28 @@ use std::error;
 use std::str;
 use std::path::Path;
 use std::time::Duration;
+use std::collections::HashMap;
 use utils;
 
 pub struct EndPoint {
     local_connection: SocketAddrV4,
     // A server doesn't need a remote_connection
-    remote_connection: Option<SocketAddrV4>,
+    connections: Option<Arc<HashMap<String, SocketAddrV4>>>,
 }
 
 impl EndPoint {
     pub fn new(remote: &str, port: &str, is_server: bool) -> Result<EndPoint, AddrParseError> {
 
-        let ipv4 = try!(get_ip_from(remote));
         if is_server {
             Ok(EndPoint {
                 local_connection: SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 6900),
-                remote_connection: None,
+                connections: None,
             })
         } else {
+            let ipv4 = try!(get_ip_from(remote));
             Ok(EndPoint {
                 local_connection: SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 9990),
-                remote_connection: Some(SocketAddrV4::new(ipv4, 6900)),
+                connections: Some(Arc::new(HashMap::with_capacity(1024))),
             })
         }
     }
@@ -57,21 +58,24 @@ impl EndPoint {
                 println!("file requested: {}", filename.unwrap());
                 // Send data via the socket
                 let mut fs = FileStreamReader::new(String::from(filename.unwrap())).unwrap();
-                let (mut buf, num_bytes_read) = fs.next().unwrap();
+                let (mut buf, mut num_bytes_read) = fs.next().unwrap();
                 let v = self.create_data_packet(last_blk_id, &buf, num_bytes_read);
                 let mut time_out = 3; //3 secs
                 socket.set_read_timeout(Some(Duration::new(time_out, 0)));
                 try!(socket.send_to(v.as_slice(), src));
-                // TODO start timer here
                 loop {
                     // Get ACK
                     match socket.recv_from(&mut buf){
                         Ok((amt, src)) => {
                             if buf[1] == 4 {
                                 println!("ACK received");
+                                if num_bytes_read < 512{
+                                    break;
+                                }
                                 //TODO verify the ACK received was for the last block id 
                                 last_blk_id += 1;
-                                let (buf, num_bytes_read) = fs.next().unwrap();
+                                let (buf, bytes_read) = fs.next().unwrap();
+                                num_bytes_read = bytes_read;
                                 let v = self.create_data_packet(last_blk_id, &buf, num_bytes_read);
                                 try!(socket.send_to(v.as_slice(), src));
                             } 
@@ -93,7 +97,6 @@ impl EndPoint {
 
                 //TODO fix the vec use to copy slice from buf
                 let mut v = vec![0;i];
-                //panic!("{}, {}", v.len(), &buf[2..2+i].len());
                 v.copy_from_slice(&buf[2..2+i]);
                 let filename = str::from_utf8(v.as_slice());
                 println!("file requested: {}", filename.unwrap());
@@ -127,7 +130,10 @@ impl EndPoint {
                 }
 
             },
-            4 => {}
+            4 => {
+                let packet = self.create_error_packet(ErrorCode::ILLEGAL_TFTP_OPERATION, "No WRQ found for this data packet"); 
+                socket.send_to(packet.as_slice(), src); 
+            },
             _ => panic!("unrecognized packet type"),
         }
 
