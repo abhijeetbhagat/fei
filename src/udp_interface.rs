@@ -102,8 +102,7 @@ impl EndPoint {
                 let mut block_num = 0u16;
                 let mut time_out = 3;
                 loop{
-                    let low = block_num & 0x00FF;
-                    let high = (block_num & 0xFF00) >> 8;
+                    let (low, high) = utils::to_bytes(block_num);
 
                     println!("Sending ACK");
                     socket.send_to(&[0, PacketType::ACK as u8, high as u8, low as u8], src);
@@ -158,8 +157,9 @@ impl EndPoint {
         let mut v = Vec::with_capacity(num_bytes + 4);
         v.push(0);
         v.push(PacketType::DATA as u8);
-        v.push((blk_id >> 8) as u8);
-        v.push((blk_id & 0x00FF) as u8);
+        let (low, high) = utils::to_bytes(blk_id);
+        v.push(high);
+        v.push(low);
         v.extend_from_slice(&buf[0..num_bytes]);
         v
     }
@@ -214,9 +214,9 @@ impl EndPoint {
                         writer.append(&buf[4..4 + block_size]);
                         let block_num: u16 = 0u16 | (buf[2] as u16) << 8 | buf[3] as u16;
 
+                        let (low, high) = utils::to_bytes(block_num);
+
                         // send ACK
-                        let low = block_num & 0x00FF;
-                        let high = (block_num & 0xFF00) >> 8;
 
                         println!("Sending ACK");
                         socket.send_to(&[0, PacketType::ACK as u8, high as u8, low as u8], src);
@@ -236,6 +236,7 @@ impl EndPoint {
 
         Ok(())
     }
+
 
     pub fn put(&mut self, files: &[&str], mode: &'static str) -> Result<(), Error>{
         let socket = try!(UdpSocket::bind(self.local_connection));
