@@ -6,3 +6,4 @@ authors = ["abhijeetbhagat <abhijeet.bhagat@gmx.com>"]
 [dependencies]
 rand = "*"
 regex = "*"
+mio = "*"
