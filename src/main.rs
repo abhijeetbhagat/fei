@@ -5,11 +5,13 @@ mod udp_interface;
 mod utils;
 mod command_parser;
 
+extern crate regex;
+extern crate mio;
+
 use udp_interface::*;
 use tftp_specific::*;
 use std::io::{Write, Read};
 use utils::*;
-extern crate regex;
 use regex::Regex;
 use command_parser::{TFTPCommand, Parser};
 

@@ -1,9 +1,7 @@
 
 extern crate rand;
-// extern crate time;
 
-// use time::PreciseTime;
-use std::net::{Ipv4Addr, SocketAddrV4, UdpSocket};
+use std::net::{Ipv4Addr, SocketAddrV4, SocketAddr};
 use file_stream_iter::{FileStreamReader, FileStreamWriter};
 use std::io::{ErrorKind, Error};
 use tftp_specific::{ErrorCode, PacketType};
@@ -13,9 +11,133 @@ use std::error;
 use std::str;
 use std::path::Path;
 use std::time::Duration;
-use std::collections::HashMap;
-use std::thread;
+use mio::udp::UdpSocket;
+use mio::util::Slab;
+use mio::{Token, EventLoop, EventSet, Handler};
 use utils;
+
+const SERVER : Token = Token(0);
+
+struct TFTPEndpoint{
+    socket : UdpSocket,
+    clients : Slab<UdpSocket>
+}
+
+impl TFTPEndpoint{
+    fn new()->Self{
+        TFTPEndpoint{
+            socket : UdpSocket::bound("127.0.0.1:6900".parse::<SocketAddr>()),
+            clients : Slab::new_starting_at(Token(1), 1024)
+        }
+    }
+}
+
+impl Handler for TFTPEndpoint{
+    fn ready(&mut self, event_loop: &mut EventLoop<TFTPEndpoint>, token : Token, events: EventSet){
+        match token{
+            SERVER =>  {
+                let mut buf = [0u8; 516]; //UDP packet is 516 bytes
+                match self.socket.recv_from(&mut buf){
+                    Ok(Some((amt, src))) => {
+                        match buf[1] {
+                            1 => {
+                                // RRQ
+                                println!("RRQ received");
+                                // Get filename to be sent from the packet
+                                let i = utils::get_terminator_position(&buf[2..amt-2]);
+                                let filename = str::from_utf8(&buf[2..2+i]);
+                                println!("file requested: {}", filename.unwrap());
+                                // Send data via the socket
+                                let mut fs = FileStreamReader::new(String::from(filename.unwrap())).unwrap();
+                                let (mut buf, mut num_bytes_read) = fs.next().unwrap();
+                                let mut last_blk_id = 0;
+                                let v = self.create_data_packet(last_blk_id, &buf, num_bytes_read);
+                                let mut time_out = 3; //3 secs
+                                self.socket.set_read_timeout(Some(Duration::new(time_out, 0)));
+                                self.socket.send_to(v.as_slice(), src);
+                                loop {
+                                    // Get ACK
+                                    match self.socket.recv_from(&mut buf){
+                                        Ok((amt, src)) => {
+                                            if buf[1] == 4 {
+                                                println!("ACK received");
+                                                if num_bytes_read < 512{
+                                                    break;
+                                                }
+                                                //TODO verify the ACK received was for the last block id 
+                                                last_blk_id += 1;
+                                                let (buf, bytes_read) = fs.next().unwrap();
+                                                num_bytes_read = bytes_read;
+                                                let v = self.create_data_packet(last_blk_id, &buf, num_bytes_read);
+                                                self.socket.send_to(v.as_slice(), src);
+                                            } 
+                                        },
+                                        Err(ref e) if e.kind() == ErrorKind::TimedOut => {
+                                            time_out += 3;
+                                            self.socket.set_read_timeout(Some(Duration::new(time_out, 0)));
+                                        },
+                                        Err(e) => {
+
+                                        }
+                                    }
+                                }
+                            },
+                            2 => {
+                                //WRQ
+                                println!("WRQ received");
+                                let i = utils::get_terminator_position(&buf[2..]);
+
+                                //TODO fix the vec use to copy slice from buf
+                                let mut v = vec![0;i];
+                                v.copy_from_slice(&buf[2..2+i]);
+                                let filename = str::from_utf8(v.as_slice());
+                                println!("file requested: {}", filename.unwrap());
+                                let mut writer = FileStreamWriter::new(String::from(filename.unwrap())).unwrap();
+                                //send ACK
+                                let mut block_num = 0u16;
+                                let mut time_out = 3;
+                                loop{
+                                    let (low, high) = utils::to_bytes(block_num);
+
+                                    println!("Sending ACK");
+                                    self.socket.send_to(&[0, PacketType::ACK as u8, high as u8, low as u8], src);
+
+                                    Self::clear_buf(&mut buf);
+                                    match self.socket.recv_from(&mut buf){
+                                        Ok((amt, src)) => { 
+                                            let block_size = amt - 4;
+                                            writer.append(&buf[4..4 + block_size]);
+                                            if block_size < 512{
+                                                writer.close();
+                                                break;
+                                            }
+                                            block_num += 1;
+                                        },
+                                        Err(ref e) if e.kind() == ErrorKind::TimedOut => {
+                                            time_out += 3;
+                                            self.socket.set_read_timeout(Some(Duration::new(time_out, 0)));
+                                        },  
+                                        Err(e) => {}  // bail out
+                                    } 
+                                }
+
+                            },
+                            4 => {
+                                let packet = self.create_error_packet(ErrorCode::ILLEGAL_TFTP_OPERATION, "No WRQ found for this data packet"); 
+                                self.socket.send_to(packet.as_slice(), src); 
+                            },
+                            _ => panic!("unrecognized packet type"),
+                        }
+                    },
+
+                }
+
+            },
+            _ => {}//client connections
+        }
+
+    }
+}
 
 pub struct EndPoint {
     local_connection: SocketAddrV4,
