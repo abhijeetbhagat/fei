@@ -1,5 +1,6 @@
 
 extern crate rand;
+extern crate mio;
 
 use std::net::{Ipv4Addr, SocketAddrV4, SocketAddr};
 use file_stream_iter::{FileStreamReader, FileStreamWriter};
@@ -12,15 +13,16 @@ use std::str;
 use std::path::Path;
 use std::time::Duration;
 use mio::udp::UdpSocket;
-use mio::util::Slab;
-use mio::{Token, EventLoop, EventSet, Handler};
+use slab::Slab;
+use mio::{Token, Ready, };
+use mio::deprecated::{Handler, EventLoop}; 
 use utils;
 
 const SERVER : Token = Token(0);
 
 struct TFTPEndpoint{
     socket : UdpSocket,
-    clients : Slab<UdpSocket>
+    clients : Slab<UdpSocket, usize>
 }
 
 impl TFTPEndpoint{
@@ -33,7 +35,7 @@ impl TFTPEndpoint{
 }
 
 impl Handler for TFTPEndpoint{
-    fn ready(&mut self, event_loop: &mut EventLoop<TFTPEndpoint>, token : Token, events: EventSet){
+    fn ready(&mut self, event_loop: &mut EventLoop<TFTPEndpoint>, token : Token, events: Ready){
         match token{
             SERVER =>  {
                 let mut buf = [0u8; 516]; //UDP packet is 516 bytes
