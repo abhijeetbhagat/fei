@@ -28,13 +28,15 @@ struct TFTPEndpoint{
 impl TFTPEndpoint{
     fn new()->Self{
         TFTPEndpoint{
-            socket : UdpSocket::bound("127.0.0.1:6900".parse::<SocketAddr>()),
-            clients : Slab::new_starting_at(Token(1), 1024)
+            socket : UdpSocket::bind(&"127.0.0.1:6900".parse::<SocketAddr>().unwrap()).unwrap(),
+            clients : Slab::new_starting_at(0, 1024)
         }
     }
 }
 
 impl Handler for TFTPEndpoint{
+    type Timeout = usize;
+    type Message = ();
     fn ready(&mut self, event_loop: &mut EventLoop<TFTPEndpoint>, token : Token, events: Ready){
         match token{
             SERVER =>  {
@@ -138,6 +140,53 @@ impl Handler for TFTPEndpoint{
             _ => {}//client connections
         }
 
+    }
+}
+
+impl  TFTPEndpoint{
+
+    fn create_error_packet(&mut self, error_code: ErrorCode, err_msg : &str)->Vec<u8>{
+        let mut v = Vec::with_capacity(2+2+err_msg.len()+1);
+        v.push(0);
+        v.push(PacketType::ERROR as u8);
+        v.push(0);
+        v.push(error_code as u8);
+        v.extend_from_slice(err_msg.as_bytes());
+        v.push('\0' as u8);
+        v 
+    }
+
+    fn clear_buf(buf : &mut[u8]){
+        assert!(buf.len() == 516);
+        for i in 0..516{
+            buf[i] = 0;
+        }
+    }
+
+    fn create_data_packet(&mut self, blk_id: u16, buf: &[u8], num_bytes: usize) -> Vec<u8> {
+        let mut v = Vec::with_capacity(num_bytes + 4);
+        v.push(0);
+        v.push(PacketType::DATA as u8);
+        let (low, high) = utils::to_bytes(blk_id);
+        v.push(high);
+        v.push(low);
+        v.extend_from_slice(&buf[0..num_bytes]);
+        v
+    }
+
+    fn create_rrq_wrq_packet(&self,
+                             p_type: PacketType,
+                             file_name: &str,
+                             mode: &'static str)
+                             -> Vec<u8> {
+        let mut v = Vec::with_capacity(2 + file_name.len() + 1 + mode.len() + 1);
+        v.push(0);
+        v.push(p_type as u8);
+        v.extend(file_name.as_bytes());
+        v.push('\0' as u8);
+        v.extend(mode.as_bytes());
+        v.push('\0' as u8);//zero terminator
+        v
     }
 }
 
