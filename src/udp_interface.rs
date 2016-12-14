@@ -20,13 +20,13 @@ use utils;
 
 const SERVER : Token = Token(0);
 
-struct TFTPEndpoint{
+pub struct TFTPEndpoint{
     socket : UdpSocket,
     clients : Slab<UdpSocket, usize>
 }
 
 impl TFTPEndpoint{
-    fn new()->Self{
+    pub fn new()->Self{
         TFTPEndpoint{
             socket : UdpSocket::bind(&"127.0.0.1:6900".parse::<SocketAddr>().unwrap()).unwrap(),
             clients : Slab::new_starting_at(0, 1024)
@@ -42,7 +42,7 @@ impl Handler for TFTPEndpoint{
             SERVER =>  {
                 let mut buf = [0u8; 516]; //UDP packet is 516 bytes
                 match self.socket.recv_from(&mut buf){
-                    Ok(Some((amt, src))) => {
+                    Ok(Some((amt, addr))) => {
                         match buf[1] {
                             1 => {
                                 // RRQ
@@ -57,12 +57,12 @@ impl Handler for TFTPEndpoint{
                                 let mut last_blk_id = 0;
                                 let v = self.create_data_packet(last_blk_id, &buf, num_bytes_read);
                                 let mut time_out = 3; //3 secs
-                                self.socket.set_read_timeout(Some(Duration::new(time_out, 0)));
-                                self.socket.send_to(v.as_slice(), src);
+                                //self.socket.set_read_timeout(Some(Duration::new(time_out, 0)));
+                                self.socket.send_to(v.as_slice(), &addr);
                                 loop {
                                     // Get ACK
                                     match self.socket.recv_from(&mut buf){
-                                        Ok((amt, src)) => {
+                                        Ok(Some((amt, addr))) => {
                                             if buf[1] == 4 {
                                                 println!("ACK received");
                                                 if num_bytes_read < 512{
@@ -73,12 +73,12 @@ impl Handler for TFTPEndpoint{
                                                 let (buf, bytes_read) = fs.next().unwrap();
                                                 num_bytes_read = bytes_read;
                                                 let v = self.create_data_packet(last_blk_id, &buf, num_bytes_read);
-                                                self.socket.send_to(v.as_slice(), src);
+                                                self.socket.send_to(v.as_slice(), &addr);
                                             } 
                                         },
                                         Err(ref e) if e.kind() == ErrorKind::TimedOut => {
                                             time_out += 3;
-                                            self.socket.set_read_timeout(Some(Duration::new(time_out, 0)));
+                                            //self.socket.set_read_timeout(Some(Duration::new(time_out, 0)));
                                         },
                                         Err(e) => {
 
@@ -104,11 +104,11 @@ impl Handler for TFTPEndpoint{
                                     let (low, high) = utils::to_bytes(block_num);
 
                                     println!("Sending ACK");
-                                    self.socket.send_to(&[0, PacketType::ACK as u8, high as u8, low as u8], src);
+                                    self.socket.send_to(&[0, PacketType::ACK as u8, high as u8, low as u8], &addr);
 
                                     Self::clear_buf(&mut buf);
                                     match self.socket.recv_from(&mut buf){
-                                        Ok((amt, src)) => { 
+                                        Ok(Some((amt, addr))) => { 
                                             let block_size = amt - 4;
                                             writer.append(&buf[4..4 + block_size]);
                                             if block_size < 512{
@@ -119,7 +119,7 @@ impl Handler for TFTPEndpoint{
                                         },
                                         Err(ref e) if e.kind() == ErrorKind::TimedOut => {
                                             time_out += 3;
-                                            self.socket.set_read_timeout(Some(Duration::new(time_out, 0)));
+                                            //self.socket.set_read_timeout(Some(Duration::new(time_out, 0)));
                                         },  
                                         Err(e) => {}  // bail out
                                     } 
@@ -128,7 +128,7 @@ impl Handler for TFTPEndpoint{
                             },
                             4 => {
                                 let packet = self.create_error_packet(ErrorCode::ILLEGAL_TFTP_OPERATION, "No WRQ found for this data packet"); 
-                                self.socket.send_to(packet.as_slice(), src); 
+                                self.socket.send_to(packet.as_slice(), &addr); 
                             },
                             _ => panic!("unrecognized packet type"),
                         }
@@ -190,7 +190,7 @@ impl  TFTPEndpoint{
     }
 }
 
-pub struct EndPoint {
+/*pub struct EndPoint {
     local_connection: SocketAddrV4,
     // A server doesn't need a remote_connection
     remote_connection: Option<SocketAddrV4>,
@@ -462,7 +462,7 @@ impl EndPoint {
 
         Ok(())
     }
-}
+}*/
 
 fn get_ip_from(ip: &str) -> Result<Ipv4Addr, AddrParseError> {
     Ipv4Addr::from_str(ip)
