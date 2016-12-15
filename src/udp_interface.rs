@@ -22,14 +22,14 @@ const SERVER : Token = Token(0);
 
 pub struct TFTPEndpoint{
     socket : UdpSocket,
-    clients : Slab<UdpSocket, usize>
+    clients : Option<Slab<UdpSocket, usize>>
 }
 
 impl TFTPEndpoint{
     pub fn new()->Self{
         TFTPEndpoint{
             socket : UdpSocket::bind(&"127.0.0.1:6900".parse::<SocketAddr>().unwrap()).unwrap(),
-            clients : Slab::new_starting_at(0, 1024)
+            clients : Some(Slab::new_starting_at(0, 1024))
         }
     }
 }
